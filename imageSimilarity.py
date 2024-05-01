@@ -1,10 +1,10 @@
 import cv2
 import numpy as np
 import os
+from keras.api.applications.vgg16 import VGG16, preprocess_input
+from keras.api.preprocessing.image import img_to_array
+from keras.api.models import Model
 from skimage.metrics import structural_similarity as ssim
-from tensorflow.keras.applications.vgg16 import VGG16, preprocpre_process_input
-from tensorflow.keras.preprocessing.image import img_to_array
-from tensorflow.keras.models import Model
 
 def orb_sim(img1, img2):
     """ ORB benzerliğini hesaplar """
