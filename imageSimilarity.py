@@ -1,16 +1,20 @@
 import cv2
 import numpy as np
 import os
-from keras.api.applications.vgg16 import VGG16, preprocess_input
-from keras.api.preprocessing.image import img_to_array
-from keras.api.models import Model
+import pandas as pd
 from skimage.metrics import structural_similarity as ssim
+import tensorflow as tf
+from tensorflow.keras.applications.vgg16 import VGG16, preprocess_input
+from tensorflow.keras.preprocessing.image import img_to_array
 
-def orb_sim(img1, img2):
+
+def orb_similarity(img1, img2):
     """ ORB benzerliğini hesaplar """
     orb = cv2.ORB_create()
     kp1, des1 = orb.detectAndCompute(img1, None)
     kp2, des2 = orb.detectAndCompute(img2, None)
+    if des1 is None or des2 is None:
+        return 0
     bf = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
     matches = bf.match(des1, des2)
     similar_regions = [i for i in matches if i.distance < 59]
@@ -18,10 +22,12 @@ def orb_sim(img1, img2):
         return 0
     return len(similar_regions) / len(matches)
 
+
 def structural_sim(img1, img2):
     """ SSIM benzerliğini hesaplar """
     sim, _ = ssim(img1, img2, full=True)
     return sim
+
 
 def preprocess_image(image_path):
     """ Görüntüyü VGG16 modeline uygun şekilde işler """
@@ -32,7 +38,8 @@ def preprocess_image(image_path):
     img = preprocess_input(img)
     return img
 
-def vgg16_feature_similarity(image1, image2):
+
+def vgg16_feature_similarity(model, image1, image2):
     """ İki görüntünün VGG16 özellik benzerliğini hesaplar """
     img1 = preprocess_image(image1)
     img2 = preprocess_image(image2)
@@ -41,40 +48,37 @@ def vgg16_feature_similarity(image1, image2):
     similarity = np.dot(feat1, feat2) / (np.linalg.norm(feat1) * np.linalg.norm(feat2))
     return similarity
 
+
 # VGG16 Modelini Yükle
 base_model = VGG16(weights='imagenet')
-model = Model(inputs=base_model.input, outputs=base_model.get_layer('fc1').output)
+model = tf.keras.Model(inputs=base_model.input, outputs=base_model.get_layer('fc1').output)
 
 
-# Diğer kütüphane importları ve fonksiyon tanımları aynı kalacak
-
-def compare_images(base_image, comparison_image, comparison_image_path):
-    """ İki görüntü arasındaki ORB, SSIM ve VGG16 benzerliğini hesaplar ve yazdırır """
-    # Görüntüleri aynı boyuta getir
+def compare_images(model, base_image, comparison_image, comparison_image_path):
+    """ İki görüntü arasındaki ORB, SSIM ve VGG16 benzerliğini hesaplar """
     comparison_image_resized = cv2.resize(comparison_image, (base_image.shape[1], base_image.shape[0]))
 
-    orb_similarity = orb_sim(base_image, comparison_image_resized)
-    ssim_similarity = structural_sim(base_image, comparison_image_resized)
-    vgg_similarity = vgg16_feature_similarity("c1.jpg", comparison_image_path)
+    orb_sim_score = orb_similarity(base_image, comparison_image_resized)
+    ssim_score = structural_sim(base_image, comparison_image_resized)
+    vgg16_score = vgg16_feature_similarity(model, "c1.jpg", comparison_image_path)
 
-    print(f"ORB Similarity: {orb_similarity}")
-    print(f"SSIM Similarity: {ssim_similarity}")
-    print(f"VGG16 Similarity: {vgg_similarity}")
+    return orb_sim_score, ssim_score, vgg16_score
 
-
-# Görüntüleri okuma ve döngü aynı kalacak
 
 # Görüntüleri oku
-image_c1 = cv2.imread("c1.jpg", 0)  # Gri tonlama için 0
+image_c1 = cv2.imread("c1.jpg", 0)
 
-# Karşılaştırmak için resim isimlerini bir liste olarak sakla
-comparison_images = ["o1.jpg", "o2.jpg", "o3.jpg"]
+# Sonuçları saklayacak DataFrame oluştur
+results = pd.DataFrame(columns=['Image', 'ORB', 'SSIM', 'VGG16'])
 
-# Her bir karşılaştırma resmi için döngü
-for img_name in comparison_images:
+# Karşılaştırma resimlerini işle
+for i in range(1, 111):
+    img_name = f"images/o{i}.png"
     if os.path.exists(img_name):
         comparison_image = cv2.imread(img_name, 0)
-        print(f"\nComparing c1 and {img_name}:")
-        compare_images(image_c1, comparison_image, img_name)
-    else:
-        print(f"Resim bulunamadı: {img_name}")
+        orb_sim, ssim_sim, vgg_sim = compare_images(model, image_c1, comparison_image, img_name)
+        results.loc[len(results)] = [img_name, orb_sim, ssim_sim, vgg_sim]
+        print(f"Image: {img_name}, ORB: {orb_sim}, SSIM: {ssim_sim}, VGG16: {vgg_sim}")
+
+# Sonuçları Excel dosyasına kaydet
+results.to_excel('comparison_results.xlsx', index=False)
