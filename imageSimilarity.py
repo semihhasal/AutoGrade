@@ -73,7 +73,7 @@ results = pd.DataFrame(columns=['Image', 'ORB', 'SSIM', 'VGG16'])
 
 # Karşılaştırma resimlerini işle
 for i in range(1, 111):
-    img_name = f"images/o{i}.png"
+    img_name = f"images/o{i}.jpg"
     if os.path.exists(img_name):
         comparison_image = cv2.imread(img_name, 0)
         orb_sim, ssim_sim, vgg_sim = compare_images(model, image_c1, comparison_image, img_name)
