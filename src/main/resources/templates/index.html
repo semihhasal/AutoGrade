@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+  <title>Image Comparison Tool</title>
+  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+  <style>
+    body {
+      background-color: #f8f9fa;
+    }
+    .container {
+      margin-top: 50px;
+      text-align: center;
+    }
+    .result {
+      margin-top: 20px;
+    }
+    #comparisonImage {
+      margin-left: 20px;
+    }
+    #imageSelect {
+      margin-top: 20px;
+    }
+    #fileUpload {
+      margin-top: 10px;
+    }
+    .btn {
+      margin-top: 10px;
+    }
+    #scores {
+      margin-top: 20px;
+      background-color: white;
+      border: 1px solid #dee2e6;
+      border-radius: 5px;
+      padding: 20px;
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+  <h1>Image Comparison Tool</h1>
+  <div>
+    <img src="images/c1.jpg" alt="Base Image" style="width: 300px; height: 200px;">
+    <img id="comparisonImage" alt="Comparison Image" style="width: 300px; height: 200px;">
+  </div>
+  <div>
+    <label for="imageSelect">Select an image:</label>
+    <select id="imageSelect">
+      <!-- Seçenekler JavaScript tarafından dinamik olarak doldurulacak -->
+    </select>
+    <p>Or upload an image:</p>
+    <input type="file" id="fileUpload" accept="image/png, image/jpeg">
+  </div>
+  <div>
+    <button class="btn btn-success" onclick="runAlgorithms()">Run Algorithms</button>
+  </div>
+  <div id="scores" class="result">
+    <p id="orbScore">ORB Score: undefined</p>
+    <p id="ssimScore">SSIM Score: undefined</p>
+    <p id="vgg16Score">VGG16 Score: undefined</p>
+  </div>
+</div>
+<script th:inline="javascript">
+  document.addEventListener('DOMContentLoaded', function () {
+    fetchImages();
+
+    document.getElementById('imageSelect').addEventListener('change', function () {
+      var imagePath = this.value;
+      if (imagePath) {
+        document.getElementById('comparisonImage').src = 'images/' + imagePath;
+      }
+    });
+
+    document.getElementById('fileUpload').addEventListener('change', function () {
+      var file = this.files[0];
+      if (file) {
+        var reader = new FileReader();
+        reader.onload = function (e) {
+          document.getElementById('comparisonImage').src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+      }
+    });
+  });
+
+  function fetchImages() {
+    fetch('/api/images')
+            .then(response => response.json())
+            .then(images => {
+              var select = document.getElementById('imageSelect');
+              images.forEach(function (image) {
+                var option = new Option(image, image);
+                select.appendChild(option);
+              });
+            })
+            .catch(error => console.error('Error loading images:', error));
+  }
+
+  function runAlgorithms() {
+    var selectedImage = document.getElementById('imageSelect').value;
+    var fileUpload = document.getElementById('fileUpload').files[0];
+
+    if (!selectedImage && !fileUpload) {
+      alert('Please select or upload an image first.');
+      return;
+    }
+
+    if (fileUpload) {
+      var formData = new FormData();
+      formData.append('image', fileUpload);
+
+      fetch('http://127.0.0.1:5000/api/compare/upload', {
+        method: 'POST',
+        body: formData
+      })
+              .then(response => {
+                if (!response.ok) {
+                  throw new Error('Network response was not ok ' + response.statusText);
+                }
+                return response.json();
+              })
+              .then(data => {
+                if (data && data.orb !== undefined && data.ssim !== undefined && data.vgg16 !== undefined) {
+                  document.getElementById('orbScore').textContent = 'ORB Score: ' + data.orb.toFixed(3);
+                  document.getElementById('ssimScore').textContent = 'SSIM Score: ' + data.ssim.toFixed(3);
+                  document.getElementById('vgg16Score').textContent = 'VGG16 Score: ' + data.vgg16.toFixed(3);
+                } else {
+                  console.error('Missing data in response:', data);
+                  alert('Some scores are missing in the response.');
+                }
+              })
+              .catch(error => {
+                console.error('Error:', error);
+                alert('Failed to fetch the scores');
+              });
+    } else {
+      fetch('http://127.0.0.1:5000/api/compare?image=' + encodeURIComponent(selectedImage))
+              .then(response => {
+                if (!response.ok) {
+                  throw new Error('Network response was not ok ' + response.statusText);
+                }
+                return response.json();
+              })
+              .then(data => {
+                if (data && data.orb !== undefined && data.ssim !== undefined && data.vgg16 !== undefined) {
+                  document.getElementById('orbScore').textContent = 'ORB Score: ' + data.orb.toFixed(3);
+                  document.getElementById('ssimScore').textContent = 'SSIM Score: ' + data.ssim.toFixed(3);
+                  document.getElementById('vgg16Score').textContent = 'VGG16 Score: ' + data.vgg16.toFixed(3);
+                } else {
+                  console.error('Missing data in response:', data);
+                  alert('Some scores are missing in the response.');
+                }
+              })
+              .catch(error => {
+                console.error('Error:', error);
+                alert('Failed to fetch the scores');
+              });
+    }
+  }
+</script>
+</body>
+</html>
