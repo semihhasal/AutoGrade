@@ -65,10 +65,10 @@ def compare_images(base_image, comparison_image, comparison_image_path):
 # Görüntüleri okuma ve döngü aynı kalacak
 
 # Görüntüleri oku
-image_c1 = cv2.imread("c1.jpg", 0)  # Gri tonlama için 0
+image_c1 = cv2.imread("images\\c.png", 0)  # Gri tonlama için 0
 
 # Karşılaştırmak için resim isimlerini bir liste olarak sakla
-comparison_images = ["o1.jpg", "o2.jpg", "o3.jpg"]
+comparison_images = ["images\\o1.png", "images\\o2.png", "images\\o3.png"]
 
 # Her bir karşılaştırma resmi için döngü
 for img_name in comparison_images:
