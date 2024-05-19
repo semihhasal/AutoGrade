@@ -627,6 +627,7 @@ def root_mean_score_error(real_grade, predicted_grade):
 def main():
     weighted_grades = []
     distance_list = [] 
+    grades_sorted_list = []
     for i in range(len(ORB_input)): 
         distance_list = []       
         for j in range(len(orb_list)):
@@ -636,8 +637,11 @@ def main():
         grades_sorted_list = rearrangedGrade(sorted_distance_list, distance_list, grade_list)
         weighted_grades.append(weighted_grade(grades_sorted_list, sorted_distance_list, GRADED_input, i))
         
-    
-    print("mean absolute deviation : ", mean_absolute_deviation(weighted_grades, GRADED_input))    
+    print("//////////////////////////////////////////")
+    print("mean absolute deviation : ", mean_absolute_deviation(weighted_grades, GRADED_input))   
+    print("accuracy ", accuracy(weighted_grades, grades_sorted_list))
+    print("rmse ", root_mean_score_error(grades_sorted_list, weighted_grades)) 
+    print("//////////////////////////////////////////")
     cross_validation(orb_list,ssim_list,vgg16_list,grade_list)
 
 main()            
