@@ -8,6 +8,8 @@ ssim_list = []
 vgg16_list = []
 grade_list = []
 
+accuracy_k = []
+
 with open('train_data.csv', 'r', encoding='utf-8-sig') as file:
     reader = csv.DictReader(file, delimiter=';')
     
@@ -468,7 +470,7 @@ grade_list = [72,
 """for i in range(len(orb_list)):
     distance_list.append(euclidean_distance(orb_list[i], ssim_list[i], vgg16_list[i]))"""
 
-k = 3 ##input olarak al
+##k = 3 ##input olarak al
 
 ##sorted_distance_list = sorted(distance_list)
 
@@ -495,7 +497,7 @@ def rearrangedGrade(sorted_list, distance_list, grade_list):
 """for i in range(len(sorted_distance_list)):
     print(grades_sorted_list[i])"""
 
-def weighted_grade(grades, distance, real_grades, index):
+def weighted_grade(grades, distance, real_grades, index, k):
     around_grade = 0
     total_diverse_distance = 0
     for i in range(k):
@@ -510,7 +512,7 @@ def weighted_grade(grades, distance, real_grades, index):
 def mean_absolute_deviation(weighted_grades, graded_test):
     total_difference = 0
     total_real_grades = 0
-    for i in range(len(weighted_grades)):
+    for i in range(len(graded_test)):
         total_difference += abs(weighted_grades[i] - graded_test[i])
         total_real_grades += graded_test[i]
 
@@ -522,7 +524,7 @@ def accuracy(predicted_grades, real_grades):
     false_list = []
     accuracy_value = 0
     for i in range(len(predicted_grades)):
-        if(((predicted_grades[i] + predicted_grades[i]*0.22) >= real_grades[i]) and ((predicted_grades[i] - predicted_grades[i]*0.22) <= real_grades[i])):
+        if(((predicted_grades[i] + predicted_grades[i]*0.30) >= real_grades[i]) and ((predicted_grades[i] - predicted_grades[i]*0.30) <= real_grades[i])):
             true_list.append(1)
             """print((predicted_grades[i] + predicted_grades[i]*0.16), " >= ", real_grades[i])
             print(((predicted_grades[i] - predicted_grades[i]*0.16), " <= ", real_grades[i]))"""
@@ -534,10 +536,12 @@ def accuracy(predicted_grades, real_grades):
     accuracy_value = len(true_list) / len(predicted_grades)
     return accuracy_value
 
-def cross_validation(orb_train, ssim_train, vgg16_train, graded_train):
+def cross_validation(orb_train, ssim_train, vgg16_train, graded_train, k_values, k_index):
     accuracy_list = []
     test_index = []
     weighted_grades = []
+    mad_list = []
+    rmse_list = []
 
     orb_train_fold = []
     ssim_train_fold = []
@@ -549,8 +553,8 @@ def cross_validation(orb_train, ssim_train, vgg16_train, graded_train):
     vgg16_test_list = []
     graded_test_list = [] 
     distance_list = []
-
-    
+    total = 0
+    final_accuracy = 0
     for i in range(5):
         test_index = random.sample(range(0,len(orb_train) - 1),20)
         ##print(f"Random numbers for iteration {i+1}: {test_index}")
@@ -575,7 +579,9 @@ def cross_validation(orb_train, ssim_train, vgg16_train, graded_train):
            
             sorted_distance_list = sorted(distance_list)
             grades_sorted_list = rearrangedGrade(sorted_distance_list, distance_list, graded_train_fold)
-            weighted_grades.append(weighted_grade(grades_sorted_list, sorted_distance_list, graded_test_list, j))
+            weighted_grades.append(weighted_grade(grades_sorted_list, sorted_distance_list, graded_test_list, j, k_values))
+        mad_list.append(mean_absolute_deviation(weighted_grades, graded_test_list)) 
+        rmse_list.append(root_mean_score_error(grades_sorted_list, weighted_grades))   
         accuracy_list.append(accuracy(weighted_grades, grades_sorted_list))
         print("mean absolute deviation : ", mean_absolute_deviation(weighted_grades, graded_test_list)) 
         print("accuracy ", accuracy(weighted_grades, grades_sorted_list))
@@ -592,21 +598,50 @@ def cross_validation(orb_train, ssim_train, vgg16_train, graded_train):
         orb_train_fold = []
         ssim_train_fold = []
         vgg16_train_fold = []
-        graded_train_fold = []        
-    plot_accuracy_cross_validation(accuracy_list)
+        graded_train_fold = []
+    for i in range(len(accuracy_list)):
+        total += accuracy_list[i]
 
-def plot_accuracy_cross_validation(accuracy_list):
+    
+    final_accuracy = total / len(accuracy_list)
+    accuracy_k.append(final_accuracy)
+    print("when k values is " + str(k_values) + " accuracy is " + str(final_accuracy))
+    plot_accuracy_cross_validation(accuracy_list, mad_list, k_values)
+    plot_rmse_cross_validation(rmse_list, k_values)
+
+def plot_accuracy_cross_validation(accuracy_list, mad_list, k_values):
     accuracy_values = accuracy_list
     cv_indices = range(1, len(accuracy_values) + 1)
-
-    plt.figure(figsize=(8, 6))
-    plt.plot(cv_indices, accuracy_values, marker='o', linestyle='-')
-    plt.title('Cross-Validation Accuracy Values')
+    plt.figure(figsize=(10, 8))
+    ##plt.figure(figsize=(8, 6))
+    plt.plot(cv_indices, accuracy_values, marker='o', linestyle='-', label='Accuracy')
+    plt.plot(cv_indices, mad_list, marker='s', linestyle='-', color='r', label='MAD')
+    plt.title('Cross-Validation Accuracy and MAD Values for k = ' + str(k_values))
     plt.xlabel('Cross-Validation Fold')
-    plt.ylabel('Accuracy')
+    plt.ylabel('Accuracy, MAD')
     plt.xticks(cv_indices)  # x ekseni etiketleri her bir cross-validation katmanının indeksiyle eşleşecek şekilde ayarlanır
-    plt.ylim(0, 1)  # Y ekseni aralığını (ylim) 0 ile 1 arasında belirleyin
+    ##plt.ylim(0, 1)  # Y ekseni aralığını (ylim) 0 ile 1 arasında belirleyin
+    plt.ylim(0, max(max(accuracy_values), max(mad_list)) * 1.1)
     plt.grid(True)
+    plt.legend()
+    plt.show()
+
+def plot_rmse_cross_validation(rmse_list, k_values):
+    rmse_values = rmse_list
+    cv_indices = range(1, len(rmse_values) + 1)
+
+    plt.figure(figsize=(10, 8))
+    
+    # RMSE değerlerini çiz
+    plt.plot(cv_indices, rmse_values, marker='s', linestyle='-', color='orange', label='RMSE')
+    
+    plt.title('Cross-Validation RMSE Values for Different k: '  + str(k_values))
+    plt.xlabel('Cross-Validation Fold')
+    plt.ylabel('RMSE')
+    plt.xticks(cv_indices)  # x ekseni etiketleri her bir k değerine karşılık gelecek şekilde ayarlanır
+    plt.ylim(0, max(rmse_values) * 1.1)  # Y ekseni aralığını en yüksek RMSE değerine göre belirleyin
+    plt.grid(True)
+    plt.legend()
     plt.show()
 
 
@@ -625,10 +660,39 @@ def root_mean_score_error(real_grade, predicted_grade):
     return result
 
 def main():
+    k_values = [3, 4, 5]
     weighted_grades = []
     distance_list = [] 
     grades_sorted_list = []
-    for i in range(len(ORB_input)): 
+    mean_accuracy = 0
+    for k in range(len(k_values)):
+        print("k value is changed: **************************** " + str(k_values[k]))
+        for i in range(len(ORB_input)): 
+            distance_list = []       
+            for j in range(len(orb_list)):
+                 distance_list.append(euclidean_distance(orb_list[j], ssim_list[j], vgg16_list[j], ORB_input, SSIM_input, VGG16_input, i))
+           
+            sorted_distance_list = sorted(distance_list)
+            grades_sorted_list = rearrangedGrade(sorted_distance_list, distance_list, grade_list)
+            weighted_grades.append(weighted_grade(grades_sorted_list, sorted_distance_list, GRADED_input, i, k_values[k]))
+        
+        print("//////////////////////////////////////////")
+        print("mean absolute deviation : ", mean_absolute_deviation(weighted_grades, GRADED_input))   
+        print("accuracy ", accuracy(weighted_grades, grades_sorted_list))
+        print("rmse ", root_mean_score_error(grades_sorted_list, weighted_grades)) 
+        print("//////////////////////////////////////////")
+        cross_validation(orb_list,ssim_list,vgg16_list,grade_list, k_values[k], k)
+    for i, in range(len(accuracy_k)):
+        mean_accuracy += accuracy_k[i]
+        print("mean_accuracy " + str(mean_accuracy))
+
+    print("final mean_accuracy " + str(mean_accuracy))
+
+    
+    mean_accuracy = mean_accuracy / 3
+    print("////////////******************//////////////////")
+    print("final accuracy is " + str(mean_accuracy))
+    """for i in range(len(ORB_input)): 
         distance_list = []       
         for j in range(len(orb_list)):
             distance_list.append(euclidean_distance(orb_list[j], ssim_list[j], vgg16_list[j], ORB_input, SSIM_input, VGG16_input, i))
@@ -642,6 +706,6 @@ def main():
     print("accuracy ", accuracy(weighted_grades, grades_sorted_list))
     print("rmse ", root_mean_score_error(grades_sorted_list, weighted_grades)) 
     print("//////////////////////////////////////////")
-    cross_validation(orb_list,ssim_list,vgg16_list,grade_list)
+    cross_validation(orb_list,ssim_list,vgg16_list,grade_list)"""
 
 main()            
