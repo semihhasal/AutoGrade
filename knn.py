@@ -682,7 +682,7 @@ def main():
         print("rmse ", root_mean_score_error(grades_sorted_list, weighted_grades)) 
         print("//////////////////////////////////////////")
         cross_validation(orb_list,ssim_list,vgg16_list,grade_list, k_values[k], k)
-    for i, in range(len(accuracy_k)):
+    for i in range(len(accuracy_k)):
         mean_accuracy += accuracy_k[i]
         print("mean_accuracy " + str(mean_accuracy))
 
